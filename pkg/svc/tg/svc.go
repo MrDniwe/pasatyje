@@ -1,4 +1,4 @@
-package tgworker
+package tg
 
 import (
 	"context"
