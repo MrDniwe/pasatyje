@@ -1,7 +1,8 @@
 package tg
 
 import (
-	"github.com/google/logger"
+	"log"
+
 	"github.com/mrdniwe/pasatyje/pkg/intf/tg"
 	"github.com/spf13/viper"
 )
@@ -13,14 +14,14 @@ type botCfg struct {
 
 func (b *botCfg) GetToken() string {
 	if b.token == "" {
-		logger.Fatal("token is empty")
+		log.Fatal("token is empty")
 	}
 	return b.token
 }
 
 func (b *botCfg) GetUrl() string {
 	if b.token == "" {
-		logger.Fatal("url is empty")
+		log.Fatal("url is empty")
 	}
 	return b.token
 }

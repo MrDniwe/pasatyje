@@ -1,7 +1,8 @@
 package app
 
 import (
-	"github.com/google/logger"
+	"log"
+
 	"github.com/mrdniwe/pasatyje/pkg/intf/app"
 	"github.com/spf13/viper"
 )
@@ -13,14 +14,14 @@ type appCfg struct {
 
 func (a *appCfg) GetEnvironment() app.Environment {
 	if a.env == "" {
-		logger.Fatal("no environment config specified")
+		log.Fatal("no environment config specified")
 	}
 	return a.env
 }
 
 func (a *appCfg) GetLogType() string {
 	if a.logType == "" {
-		logger.Fatal("log type is empty")
+		log.Fatal("log type is empty")
 	}
 	return a.logType
 }
