@@ -23,8 +23,7 @@ type TgBotServer interface {
 type bot struct {
 	logger  *logrus.Logger
 	botAPI  *api.BotAPI
-	msgProc tg.MsgProc
-	cmdProc tg.MsgProc
+	sp      tg.ScenarioProcessor
 	msgChan chan *api.Message
 	botCfg  tg.Config
 	appCfg  app.Config
@@ -34,8 +33,7 @@ func New(
 	botCfg tg.Config,
 	appCfg app.Config,
 	logger *logrus.Logger,
-	m tg.MsgProc,
-	c tg.MsgProc,
+	sp tg.ScenarioProcessor,
 ) TgBotServer {
 	b, err := api.NewBotAPI(botCfg.GetToken())
 	if err != nil {
@@ -48,8 +46,7 @@ func New(
 	return &bot{
 		botAPI:  b,
 		logger:  logger,
-		msgProc: m,
-		cmdProc: c,
+		sp:      sp,
 		msgChan: make(chan *api.Message, messageChanBufsize),
 		botCfg:  botCfg,
 		appCfg:  appCfg,
@@ -78,7 +75,7 @@ func (b *bot) listen() {
 		if update.Message == nil { // ignore any non-Message Updates
 			continue
 		}
-		b.logger.Infof("Recieved update from '%s', message: %s", update.Message.From.UserName, update.Message.Text)
+		b.logger.Debugf("Recieved update from '%s', message: %s", update.Message.From.UserName, update.Message.Text)
 		b.msgChan <- update.Message
 	}
 }
@@ -92,28 +89,19 @@ func (b *bot) runMsgProcWorker(index int) {
 		if msg.From.IsBot {
 			b.botAPI.Send(api.NewMessage(
 				msg.Chat.ID,
-				"Ссылки, присланные ботами, не обрабатываются",
+				"Бот не общается с ботами",
 			))
+			continue
 		}
 		if !msg.Chat.IsPrivate() {
 			continue
 		}
-		if msg.IsCommand() {
-			if b.cmdProc == nil {
-				b.logger.Errorf("Unable to handle TG command: no cmd procesor")
-				b.botAPI.Send(api.NewMessage(msg.Chat.ID, "Ошибка на стороне сервера: нет обработчика для команд"))
-				continue
-			}
-			resp, err := b.cmdProc.Process(context.Background(), msg)
-			if err != nil {
-				b.logger.Errorf("Error processing command: %v", err)
-				b.botAPI.Send(api.NewMessage(msg.Chat.ID, err.Error()))
-				continue
-			}
-			b.botAPI.Send(resp)
+		if b.sp == nil {
+			b.logger.Errorf("Unable to handle TG command: no scenario procesor")
+			b.botAPI.Send(api.NewMessage(msg.Chat.ID, "Ошибка на стороне сервера: нет обработчика для сценариев"))
 			continue
 		}
-		resp, err := b.msgProc.Process(context.Background(), msg)
+		resp, err := b.sp.Process(context.Background(), msg)
 		if err != nil {
 			b.logger.Errorf("Error processing message: %v", err)
 			b.botAPI.Send(api.NewMessage(msg.Chat.ID, err.Error()))

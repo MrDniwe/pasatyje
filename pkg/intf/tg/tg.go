@@ -11,6 +11,6 @@ type Config interface {
 	GetUrl() string
 }
 
-type MsgProc interface {
+type ScenarioProcessor interface {
 	Process(ctx context.Context, msg *tgbotapi.Message) (*tgbotapi.MessageConfig, error)
 }
