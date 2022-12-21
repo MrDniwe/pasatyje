@@ -23,7 +23,7 @@ type TgBotServer interface {
 type bot struct {
 	logger  *logrus.Logger
 	botAPI  *api.BotAPI
-	sp      tg.ScenarioProcessor
+	sp      tg.ScenarioProcessorV2
 	msgChan chan *api.Message
 	botCfg  tg.Config
 	appCfg  app.Config
@@ -33,7 +33,7 @@ func New(
 	botCfg tg.Config,
 	appCfg app.Config,
 	logger *logrus.Logger,
-	sp tg.ScenarioProcessor,
+	sp tg.ScenarioProcessorV2,
 ) TgBotServer {
 	b, err := api.NewBotAPI(botCfg.GetToken())
 	if err != nil {
@@ -83,7 +83,6 @@ func (b *bot) listen() {
 func (b *bot) runMsgProcWorker(index int) {
 	b.logger.Infof("Telegram bot message processing worker #%d started", index)
 	for msg := range b.msgChan {
-		var resp *api.MessageConfig
 
 		// TODO: проверки IsChannel/IsBot/IsPrivate/IsGroup итд в привязке к конфигу
 		if msg.From.IsBot {
@@ -107,6 +106,8 @@ func (b *bot) runMsgProcWorker(index int) {
 			b.botAPI.Send(api.NewMessage(msg.Chat.ID, err.Error()))
 			continue
 		}
-		b.botAPI.Send(resp)
+		for _, r := range resp {
+			b.botAPI.Send(r)
+		}
 	}
 }
