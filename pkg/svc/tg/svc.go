@@ -103,11 +103,12 @@ func (b *bot) runMsgProcWorker(index int) {
 		resp, err := b.sp.Process(context.Background(), msg)
 		if err != nil {
 			b.logger.Errorf("Error processing message: %v", err)
+			// TODO: тут нужен грамотный процессор ошибок
 			b.botAPI.Send(api.NewMessage(msg.Chat.ID, err.Error()))
 			continue
 		}
 		for _, r := range resp {
-			if resp == nil {
+			if r == nil {
 				continue
 			}
 			b.botAPI.Send(r)
