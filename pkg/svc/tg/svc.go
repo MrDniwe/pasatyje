@@ -107,6 +107,9 @@ func (b *bot) runMsgProcWorker(index int) {
 			continue
 		}
 		for _, r := range resp {
+			if resp == nil {
+				continue
+			}
 			b.botAPI.Send(r)
 		}
 	}
