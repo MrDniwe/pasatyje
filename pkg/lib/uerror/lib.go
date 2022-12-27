@@ -34,10 +34,15 @@ type customError struct {
 	errorType     ErrorType
 	originalError error
 	context       errorContext
+	scopeMessage  string
 }
 
 func (error customError) Error() string {
 	return error.originalError.Error()
+}
+
+func (error customError) ErrorLast() string {
+	return error.scopeMessage
 }
 
 // New - custom error constructor
@@ -54,6 +59,7 @@ func (t ErrorType) Newf(message string, args ...interface{}) error {
 	return customError{
 		errorType:     t,
 		originalError: err,
+		scopeMessage:  message,
 	}
 }
 
@@ -63,6 +69,7 @@ func (t ErrorType) Wrapf(err error, message string, args ...interface{}) error {
 	return customError{
 		errorType:     t,
 		originalError: nErr,
+		scopeMessage:  message,
 	}
 }
 
@@ -76,12 +83,17 @@ func New(msg string) error {
 	return customError{
 		errorType:     NoType,
 		originalError: errors.New(msg),
+		scopeMessage:  msg,
 	}
 }
 
 // Newf - returns new NoType formatted custom error
 func Newf(msg string, args ...interface{}) error {
-	return customError{}
+	return customError{
+		errorType:     NoType,
+		originalError: errors.New(fmt.Sprintf(msg, args...)),
+		scopeMessage:  msg,
+	}
 }
 
 // Wrapf - wraps an error (simple or custom) into custom error with stack and context formatted
@@ -92,11 +104,13 @@ func Wrapf(err error, message string, args ...interface{}) error {
 			errorType:     customErr.errorType,
 			originalError: wrappedErr,
 			context:       customErr.context,
+			scopeMessage:  message,
 		}
 	}
 	return customError{
 		errorType:     NoType,
 		originalError: wrappedErr,
+		scopeMessage:  message,
 	}
 }
 
