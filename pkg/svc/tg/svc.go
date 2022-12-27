@@ -2,11 +2,13 @@ package tg
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	api "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/mrdniwe/pasatyje/pkg/intf/app"
 	"github.com/mrdniwe/pasatyje/pkg/intf/tg"
+	"github.com/mrdniwe/pasatyje/pkg/lib/uerror"
 	"github.com/sirupsen/logrus"
 )
 
@@ -102,9 +104,26 @@ func (b *bot) runMsgProcWorker(index int) {
 		}
 		resp, err := b.sp.Process(context.Background(), msg)
 		if err != nil {
-			b.logger.Errorf("Error processing message: %v", err)
-			// TODO: тут нужен грамотный процессор ошибок
-			b.botAPI.Send(api.NewMessage(msg.Chat.ID, err.Error()))
+			switch uerror.GetType(err) {
+			case uerror.BadRequest:
+				b.logger.Warn(err.Error())
+				b.botAPI.Send(api.NewMessage(msg.Chat.ID, fmt.Sprintf("Ошибка в запросе: %s", uerror.GetLastError(err))))
+			case uerror.ServerError:
+				b.logger.Error(err.Error())
+				b.botAPI.Send(api.NewMessage(msg.Chat.ID, fmt.Sprintf("Ошибка на стороне сервера: %s", uerror.GetLastError(err))))
+			case uerror.NotFound:
+				b.logger.Warn(err.Error())
+				b.botAPI.Send(api.NewMessage(msg.Chat.ID, fmt.Sprintf("Не удалось найти: %s", uerror.GetLastError(err))))
+			case uerror.NotAuthorized:
+				b.logger.Warn(err.Error())
+				b.botAPI.Send(api.NewMessage(msg.Chat.ID, fmt.Sprintf("Не авторизован: %s", uerror.GetLastError(err))))
+			case uerror.Forbidden:
+				b.logger.Warn(err.Error())
+				b.botAPI.Send(api.NewMessage(msg.Chat.ID, fmt.Sprintf("Данная функциональность для вас под запретом: %s", uerror.GetLastError(err))))
+			default:
+				b.logger.Error(err.Error())
+				b.botAPI.Send(api.NewMessage(msg.Chat.ID, fmt.Sprintf("Неизвестная ошибка: %s", uerror.GetLastError(err))))
+			}
 			continue
 		}
 		for _, r := range resp {

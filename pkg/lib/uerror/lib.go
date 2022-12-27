@@ -41,10 +41,6 @@ func (error customError) Error() string {
 	return error.originalError.Error()
 }
 
-func (error customError) ErrorLast() string {
-	return error.scopeMessage
-}
-
 // New - custom error constructor
 func (t ErrorType) New(message string) error {
 	return customError{
@@ -165,4 +161,11 @@ func GetType(err error) ErrorType {
 		return customErr.errorType
 	}
 	return NoType
+}
+
+func GetLastError(err error) string {
+	if customErr, ok := err.(customError); ok {
+		return customErr.scopeMessage
+	}
+	return err.Error()
 }
