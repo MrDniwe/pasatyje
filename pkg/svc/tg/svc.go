@@ -67,10 +67,7 @@ func (b *bot) listen() {
 	u := api.NewUpdate(0)
 	u.Timeout = updateTimeout
 
-	updates, err := b.botAPI.GetUpdatesChan(u)
-	if err != nil {
-		b.logger.Fatal(err)
-	}
+	updates := b.botAPI.GetUpdatesChan(u)
 	b.logger.Info("Telegram bot listener started")
 	for update := range updates {
 		// TODO: handle all types of updates
