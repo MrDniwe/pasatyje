@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	api "github.com/go-telegram-bot-api/telegram-bot-api"
+	api "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/mrdniwe/pasatyje/pkg/intf/app"
 	"github.com/mrdniwe/pasatyje/pkg/intf/tg"
 	"github.com/mrdniwe/pasatyje/pkg/lib/uerror"
