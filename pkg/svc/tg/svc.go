@@ -101,12 +101,15 @@ func (b *bot) runCallbackWorker(index int) {
 			continue
 		}
 		// TODO: real context
-		resp, err := b.sp.HandleCallback(context.Background(), upd)
+		cb, msgList, err := b.sp.HandleCallback(context.Background(), upd)
+		if _, err1 := b.botAPI.Request(cb); err1 != nil {
+			b.handleMsgError(upd.Message, uerror.ServerError.Wrap(err1, "ошибка при отправке статуса калбэка"))
+		}
 		if err != nil {
 			b.handleMsgError(upd.Message, err)
 			continue
 		}
-		for _, r := range resp {
+		for _, r := range msgList {
 			if r == nil {
 				continue
 			}
