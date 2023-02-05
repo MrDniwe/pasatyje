@@ -79,12 +79,12 @@ func (b *bot) listen() {
 	for update := range updates {
 		// TODO: handle all types of updates
 		if update.Message != nil { // ignore any non-Message Updates
-			b.logger.Debugf("Recieved update from '%s', message: %s", update.Message.From.UserName, update.Message.Text)
+			b.logger.Debugf("\n--- recieved update from '%s', message: %s", update.Message.From.UserName, update.Message.Text)
 			b.msgChan <- update.Message
 			continue
 		}
 		if update.CallbackQuery != nil {
-			b.logger.Debugf("Recieved update from '%s', callback query: %+v", update.Message.From.UserName, update.CallbackQuery)
+			b.logger.Debugf("\n--- recieved update callback query: %+v", update.CallbackQuery)
 			b.cbChan <- update.CallbackQuery
 		}
 	}
