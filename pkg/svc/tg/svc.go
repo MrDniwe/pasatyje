@@ -13,9 +13,11 @@ import (
 )
 
 const (
-	messageWorkers     = 3
-	messageChanBufsize = 3
-	updateTimeout      = 60
+	MESSAGE_WORKERS       = 3
+	CALLBACK_WORKERS      = 3
+	MSG_CHAN_BUFSIZE      = 3
+	CALLBACK_CHAN_BUFSIZE = 3
+	UPD_TIMEOUT           = 60
 )
 
 type TgBotServer interface {
@@ -27,6 +29,7 @@ type bot struct {
 	botAPI  *api.BotAPI
 	sp      tg.ScenarioProcessorV2
 	msgChan chan *api.Message
+	cbChan  chan *api.CallbackQuery
 	botCfg  tg.Config
 	appCfg  app.Config
 }
@@ -49,7 +52,8 @@ func New(
 		botAPI:  b,
 		logger:  logger,
 		sp:      sp,
-		msgChan: make(chan *api.Message, messageChanBufsize),
+		msgChan: make(chan *api.Message, MSG_CHAN_BUFSIZE),
+		cbChan:  make(chan *api.CallbackQuery, CALLBACK_CHAN_BUFSIZE),
 		botCfg:  botCfg,
 		appCfg:  appCfg,
 	}
@@ -57,25 +61,57 @@ func New(
 
 func (b *bot) Run() {
 	go b.listen()
-	for i := 0; i < messageWorkers; i++ {
+	for i := 0; i < MESSAGE_WORKERS; i++ {
 		go b.runMsgProcWorker(i)
+	}
+	for i := 0; i < CALLBACK_WORKERS; i++ {
+		go b.runCallbackWorker(i)
 	}
 }
 
 func (b *bot) listen() {
 
 	u := api.NewUpdate(0)
-	u.Timeout = updateTimeout
+	u.Timeout = UPD_TIMEOUT
 
 	updates := b.botAPI.GetUpdatesChan(u)
 	b.logger.Info("Telegram bot listener started")
 	for update := range updates {
 		// TODO: handle all types of updates
-		if update.Message == nil { // ignore any non-Message Updates
+		if update.Message != nil { // ignore any non-Message Updates
+			b.logger.Debugf("Recieved update from '%s', message: %s", update.Message.From.UserName, update.Message.Text)
+			b.msgChan <- update.Message
 			continue
 		}
-		b.logger.Debugf("Recieved update from '%s', message: %s", update.Message.From.UserName, update.Message.Text)
-		b.msgChan <- update.Message
+		if update.CallbackQuery != nil {
+			b.logger.Debugf("Recieved update from '%s', callback query: %+v", update.Message.From.UserName, update.CallbackQuery)
+			b.cbChan <- update.CallbackQuery
+		}
+	}
+}
+
+func (b *bot) runCallbackWorker(index int) {
+	b.logger.Infof("Telegram bot callback worker #%d started", index)
+	for upd := range b.cbChan {
+		if b.sp == nil {
+			if upd.Message == nil {
+				continue
+			}
+			b.handleMsgError(upd.Message, uerror.ServerError.New("нет обработчика для калбэков"))
+			continue
+		}
+		// TODO: real context
+		resp, err := b.sp.HandleCallback(context.Background(), upd)
+		if err != nil {
+			b.handleMsgError(upd.Message, err)
+			continue
+		}
+		for _, r := range resp {
+			if r == nil {
+				continue
+			}
+			b.botAPI.Send(r)
+		}
 	}
 }
 
@@ -85,42 +121,20 @@ func (b *bot) runMsgProcWorker(index int) {
 
 		// TODO: проверки IsChannel/IsBot/IsPrivate/IsGroup итд в привязке к конфигу
 		if msg.From.IsBot {
-			b.botAPI.Send(api.NewMessage(
-				msg.Chat.ID,
-				"Бот не общается с ботами",
-			))
+			b.handleMsgError(msg, uerror.Forbidden.New("бот не общается с ботами"))
 			continue
 		}
 		if !msg.Chat.IsPrivate() {
 			continue
 		}
 		if b.sp == nil {
-			b.logger.Errorf("Unable to handle TG command: no scenario procesor")
-			b.botAPI.Send(api.NewMessage(msg.Chat.ID, "Ошибка на стороне сервера: нет обработчика для сценариев"))
+			b.handleMsgError(msg, uerror.ServerError.New("нет обработчика для сценариев"))
 			continue
 		}
+		// TODO: real context
 		resp, err := b.sp.Process(context.Background(), msg)
 		if err != nil {
-			switch uerror.GetType(err) {
-			case uerror.BadRequest:
-				b.logger.Warn(err.Error())
-				b.botAPI.Send(api.NewMessage(msg.Chat.ID, fmt.Sprintf("Ошибка в запросе: %s", uerror.GetLastError(err))))
-			case uerror.ServerError:
-				b.logger.Error(err.Error())
-				b.botAPI.Send(api.NewMessage(msg.Chat.ID, fmt.Sprintf("Ошибка на стороне сервера: %s", uerror.GetLastError(err))))
-			case uerror.NotFound:
-				b.logger.Warn(err.Error())
-				b.botAPI.Send(api.NewMessage(msg.Chat.ID, fmt.Sprintf("Не удалось найти: %s", uerror.GetLastError(err))))
-			case uerror.NotAuthorized:
-				b.logger.Warn(err.Error())
-				b.botAPI.Send(api.NewMessage(msg.Chat.ID, fmt.Sprintf("Не авторизован: %s", uerror.GetLastError(err))))
-			case uerror.Forbidden:
-				b.logger.Warn(err.Error())
-				b.botAPI.Send(api.NewMessage(msg.Chat.ID, fmt.Sprintf("Данная функциональность для вас под запретом: %s", uerror.GetLastError(err))))
-			default:
-				b.logger.Error(err.Error())
-				b.botAPI.Send(api.NewMessage(msg.Chat.ID, fmt.Sprintf("Неизвестная ошибка: %s", uerror.GetLastError(err))))
-			}
+			b.handleMsgError(msg, err)
 			continue
 		}
 		for _, r := range resp {
@@ -129,5 +143,40 @@ func (b *bot) runMsgProcWorker(index int) {
 			}
 			b.botAPI.Send(r)
 		}
+	}
+}
+
+func (b *bot) handleMsgError(msg *api.Message, err error) {
+	if msg == nil {
+		b.handleChatError(0, err)
+		return
+	}
+	b.handleChatError(msg.Chat.ID, err)
+}
+
+func (b *bot) handleChatError(chatID int64, err error) {
+	var errPattern string
+	switch uerror.GetType(err) {
+	case uerror.BadRequest:
+		b.logger.Warn(err.Error())
+		errPattern = "Ошибка в запросе"
+	case uerror.ServerError:
+		b.logger.Error(err.Error())
+		errPattern = "Ошибка на стороне сервера"
+	case uerror.NotFound:
+		b.logger.Warn(err.Error())
+		errPattern = "Не удалось найти"
+	case uerror.NotAuthorized:
+		b.logger.Warn(err.Error())
+		errPattern = "Не авторизован"
+	case uerror.Forbidden:
+		b.logger.Warn(err.Error())
+		errPattern = "Данная функциональность для вас под запретом"
+	default:
+		b.logger.Error(err.Error())
+		errPattern = "Неизвестная ошибка"
+	}
+	if chatID != 0 {
+		b.botAPI.Send(api.NewMessage(chatID, fmt.Sprintf(errPattern+": %s", uerror.GetLastError(err))))
 	}
 }
