@@ -113,7 +113,7 @@ func (b *bot) runCallbackWorker(index int) {
 			if r == nil {
 				continue
 			}
-			b.botAPI.Send(*r)
+			b.botAPI.Send(r)
 		}
 	}
 }
@@ -144,7 +144,7 @@ func (b *bot) runMsgProcWorker(index int) {
 			if r == nil {
 				continue
 			}
-			b.botAPI.Send(*r)
+			b.botAPI.Send(r)
 		}
 	}
 }
