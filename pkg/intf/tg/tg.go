@@ -16,6 +16,6 @@ type ScenarioProcessor interface {
 }
 
 type ScenarioProcessorV2 interface {
-	Process(ctx context.Context, msg *tgbotapi.Message) ([]*tgbotapi.Chattable, error)
-	HandleCallback(ctx context.Context, query *tgbotapi.CallbackQuery) (*tgbotapi.CallbackConfig, []*tgbotapi.Chattable, error)
+	Process(ctx context.Context, msg *tgbotapi.Message) ([]tgbotapi.Chattable, error)
+	HandleCallback(ctx context.Context, query *tgbotapi.CallbackQuery) (*tgbotapi.CallbackConfig, []tgbotapi.Chattable, error)
 }
