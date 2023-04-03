@@ -28,7 +28,7 @@ func (m *mysqlCfg) GetDSN() string {
 // MYSQL_HOSTNAME - string representing the hostname of the MySQL server
 // MYSQL_PORT - int representing the port number of the MySQL server
 // MYSQL_DATABASE - string representing the name of the MySQL database
-func NewMySQL(v *viper.Viper, prefix string) (mysql.Config, error) {
+func New(v *viper.Viper, prefix string) (mysql.Config, error) {
 	v.SetDefault(prefix+"username", "")
 	v.BindEnv(prefix+"username", "MYSQL_USERNAME")
 	v.SetDefault(prefix+"password", "")
